@@ -1,12 +1,25 @@
 import gooeypie as gp
+import pygame
+from PIL import Image
 
-# 读取常见密码文件并调试输出
+# 初始化 pygame 音频模块
+pygame.mixer.init()
+
+# **定义图片路径**
+default_bg = "背景_resized.png"  # 默认背景图片
+strong_bg = "strong_password.png"  # 强密码对应的背景
+medium_bg = "medium.png"
+weak_bg = "weak.png"
+# **调整默认背景图片尺寸**
+image = Image.open("背景.png")  
+image = image.resize((400, 300))  
+image.save(default_bg)  # 保存调整后的默认背景
+
+# 读取常见密码文件
 def load_common_passwords(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as file:
-            passwords = set(line.strip() for line in file)
-            print(f"Loaded {len(passwords)} common passwords:", passwords)  # 调试输出
-            return passwords
+            return set(line.strip() for line in file)
     except FileNotFoundError:
         print(f"Error: File '{filename}' not found.")
         return set()
@@ -15,84 +28,94 @@ def load_common_passwords(filename):
 common_passwords = load_common_passwords("usual_password.txt")
 
 def check_password_strength(event):
-    password = password_input.text.strip()  # 确保输入密码去除空格
-    password_length = len(password)  # 计算密码字数
-    length_lbl.text = f"Password Length: {password_length} characters"  # 更新字数显示
-    print(f"User entered password ({password_length} chars): {password}")  # 调试输出
+    password = password_input.text.strip()
+    password_length = len(password)
 
-    # **检查是否为常见密码**
+    length_lbl.text = f"Password Length: {password_length} characters"
+
+    if not password:
+        result_lbl.text = "✘ Password cannot be empty!"
+        result_lbl.text_color = 'red'
+        return
+
     if password in common_passwords:
-        print("Password found in common passwords!")  # 调试输出
         result_lbl.text = "⚠ This is a common password. Please choose a stronger one!"
         result_lbl.text_color = 'red'
-        return  # 直接返回，不执行后续强度检查
+        return
 
     special_chars = "!@#$%^&*()-_=+[]{}|;:'\",.<>?/`~"
-    
-    strength = 0
-    if password_length >= 8:
-        strength += 1
-    if any(char.isdigit() for char in password):
-        strength += 1
-    if any(char.isupper() for char in password):
-        strength += 1
-    if any(char.islower() for char in password):  
-        strength += 1
-    if any(char in special_chars for char in password):
-        strength += 1
+    strength = sum([
+        password_length >= 8,
+        any(char.isdigit() for char in password),
+        any(char.isupper() for char in password),
+        any(char.islower() for char in password),
+        any(char in special_chars for char in password)
+    ])
 
-    # **更新密码强度提示**
+    # **根据强度切换背景图片**
     if strength == 5:
         result_lbl.text = "✔ Strong Password!"
-        result_lbl.text_color = 'green'
         strength_lbl.text = "Strength Level: █████ (Strong)"
-        strength_lbl.text_color = 'green'
+        result_lbl.text_color = 'green'
+        bg_image.image = strong_bg  # **修改背景图片**
     elif strength >= 3:
         result_lbl.text = "⚠ Medium Strength Password."
-        result_lbl.text_color = 'orange'
         strength_lbl.text = "Strength Level: ████░ (Medium)"
-        strength_lbl.text_color = 'orange'
+        result_lbl.text_color = 'orange'
+        bg_image.image = medium_bg  # **恢复medium背景**
     else:
-        result_lbl.text = "✘ Weak Password! Use uppercase, lowercase, number & special characters."
-        result_lbl.text_color = 'red'
+        result_lbl.text = "✘ WEAK and USUAL Password! Use uppercase, lowercase, number & special characters."
         strength_lbl.text = "Strength Level: ██░░░ (Weak)"
-        strength_lbl.text_color = 'red'
+        result_lbl.text_color = 'red'
+        bg_image.image = weak_bg  # **恢复weak and usual背景**
 
-def toggle_password_visibility(event):
-    password_input.secret = not password_input.secret  
+def play_music(event):
+    try:
+        pygame.mixer.music.load("Speed Of Light.mp3")  
+        pygame.mixer.music.play()
+    except pygame.error:
+        print("Error: Unable to play music. Check the file path.")
+
+def stop_music(event):
+    pygame.mixer.music.stop()
 
 # **创建应用窗口**
-app = gp.GooeyPieApp("To Be PasswordX Strength Checker")
+app = gp.GooeyPieApp("To Be PasswordX——Strength Checker")
 
+# **设置网格布局**
+app.set_grid(8, 2)  
+
+# **初始化背景图片**
+bg_image = gp.Image(app, default_bg)  # 默认背景图片
+app.add(bg_image, 1, 1, column_span=2)  
 # **创建控件**
 prompt_lbl = gp.Label(app, "Enter your password:")
 password_input = gp.Textbox(app)
 password_input.secret = True  
 password_input.width = 30  
-password_input.add_event_listener('change', check_password_strength)  # **监听输入变化**
 
 submit_btn = gp.Button(app, "Check", check_password_strength)
+play_btn = gp.Button(app, "Play BGM", play_music)
+stop_btn = gp.Button(app, "Stop BGM", stop_music)
 
-length_lbl = gp.Label(app, "Password Length: 0 characters")  # **新增：密码字数显示**
+length_lbl = gp.Label(app, "Password Length: 0 characters")
 result_lbl = gp.Label(app, "")
 result_lbl.font = ('Arial', 12, 'bold')
 
 strength_lbl = gp.Label(app, "Strength Level: █░░░░ (Very Weak)")
 
-# **设置网格布局**
-app.set_grid(6, 2)
-
-# **添加控件到网格**
-app.add(prompt_lbl, 1, 1)
-app.add(password_input, 1, 2)
-app.add(length_lbl, 2, 1, column_span=2)  # **新增：密码字数显示**
-app.add(submit_btn, 3, 1, column_span=2)
-app.add(strength_lbl, 4, 1, column_span=2)  
-app.add(result_lbl, 5, 1, column_span=2)
+# **添加控件**
+app.add(prompt_lbl, 2, 1)
+app.add(password_input, 2, 2)
+app.add(length_lbl, 3, 1, column_span=2)
+app.add(submit_btn, 4, 1, column_span=2)
+app.add(strength_lbl, 5, 1, column_span=2)
+app.add(result_lbl, 6, 1, column_span=2)
+app.add(play_btn, 7, 1)
+app.add(stop_btn, 7, 2)
 
 # **运行应用**
 app.run()
-
 
 
 
